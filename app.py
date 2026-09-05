@@ -2,34 +2,45 @@ import streamlit as st
 import openai
 import json
 import requests
+import io
+from pydub import AudioSegment
+from pydub.silence import split_on_silence
 
 # Pagina configuratie
 st.set_page_config(page_title="JackCraig Script Builder", layout="wide")
 
-st.title("🎬 JackCraig Script Builder")
-st.markdown("Zet long-form transcripts om in strakke, virale Shorts scripts inclusief ElevenLabs voice-overs.")
+# Initializeer session state variabelen
+if "script_data" not in st.session_state:
+    st.session_state.script_data = None
+if "full_text_to_speak" not in st.session_state:
+    st.session_state.full_text_to_speak = ""
 
-# Haal de API keys onzichtbaar op uit Streamlit Secrets
+# API Keys ophalen (onzichtbaar)
 try:
     openai_api_key = st.secrets["OPENAI_API_KEY"]
     elevenlabs_api_key = st.secrets["ELEVENLABS_API_KEY"]
-    voice_id = st.secrets.get("VOICE_ID", "pNInz6obpgDQGcFmaJgB") # Standaard Adam
+    voice_id = st.secrets.get("VOICE_ID", "pNInz6obpgDQGcFmaJgB") # Adam
 except KeyError:
     st.error("⚠️ De API keys ontbreken in de Streamlit Secrets! Voeg ze toe in je dashboard.")
     st.stop()
 
-# We houden de sidebar alleen nog voor een beetje info
+# --- ZIJBALK NAVIGATIE ---
 with st.sidebar:
-    st.success("✅ API Keys succesvol en veilig geladen!")
-    st.markdown("Je bent direct klaar om scripts en audio te genereren.")
+    st.title("🎬 JackCraig")
+    st.markdown("Script & Voice Builder")
+    st.divider()
+    
+    # Het navigatiemenu
+    menu_keuze = st.radio(
+        "Navigatie", 
+        ["📝 Transcript to Script", "🎙️ Script to Voice Over"],
+        label_visibility="collapsed"
+    )
+    
+    st.divider()
+    st.caption("✅ API Keys Actief")
 
-# Initializeer session state zodat het script niet verdwijnt bij een nieuwe klik
-if "script_data" not in st.session_state:
-    st.session_state.script_data = None
-
-# Hoofdvenster voor input
-transcript = st.text_area("📝 Plak hier je onbewerkte video transcript:", height=300)
-
+# De System Prompt
 system_prompt = """
 You are a master YouTube Shorts copywriter. Your goal is to convert a long-form video transcript into a super-engaging Short script. 
 You MUST output the script in ENGLISH, regardless of the input language.
@@ -48,59 +59,71 @@ Output STRICTLY as a JSON object with the keys:
 Each key MUST contain a nested object with exactly two strings: "timestamp" (e.g. "01:30") and "text" (the actual script line).
 """
 
-if st.button("🚀 Genereer Script", use_container_width=True):
-    if not openai_api_key:
-        st.warning("⚠️ Vul eerst je OpenAI API key in aan de linkerkant.")
-    elif not transcript:
-        st.warning("⚠️ Plak een transcript om te beginnen.")
-    else:
-        with st.spinner("AI is het script aan het schrijven en structureren..."):
-            try:
-                # OpenAI API Call
-                client = openai.OpenAI(api_key=openai_api_key)
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    response_format={ "type": "json_object" },
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": transcript}
-                    ],
-                    temperature=0.7
-                )
-                
-                # Sla het script op in het geheugen van de app
-                st.session_state.script_data = json.loads(response.choices[0].message.content)
-                st.success("✅ Script succesvol gegenereerd!")
-                
-            except Exception as e:
-                st.error(f"Er is een fout opgetreden: {e}")
+# --- SCHERM 1: TRANSCRIPT TO SCRIPT ---
+if menu_keuze == "📝 Transcript to Script":
+    st.header("📝 Transcript to Script")
+    st.markdown("Zet je long-form video om in een viraal Short script.")
+    
+    transcript = st.text_area("Plak hier je onbewerkte video transcript:", height=250)
+    
+    if st.button("🚀 Genereer Script", type="primary", use_container_width=True):
+        if not transcript:
+            st.warning("⚠️ Plak een transcript om te beginnen.")
+        else:
+            with st.spinner("AI is het script aan het schrijven..."):
+                try:
+                    client = openai.OpenAI(api_key=openai_api_key)
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        response_format={ "type": "json_object" },
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": transcript}
+                        ],
+                        temperature=0.7
+                    )
+                    
+                    # Sla op in geheugen
+                    st.session_state.script_data = json.loads(response.choices[0].message.content)
+                    
+                    # Bouw de voice-over tekst direct op
+                    st.session_state.full_text_to_speak = ""
+                    for key, content in st.session_state.script_data.items():
+                        st.session_state.full_text_to_speak += content.get('text', '') + " "
+                    
+                    st.success("✅ Script succesvol gegenereerd! Klik op 'Script to Voice Over' in de zijbalk om verder te gaan.")
+                except Exception as e:
+                    st.error(f"Er is een fout opgetreden: {e}")
 
-# Laat het script zien als het is gegenereerd
-if st.session_state.script_data:
-    st.markdown("### Jouw Script:")
-    
-    # We maken direct een lege string aan om alle tekst samen te voegen voor ElevenLabs
-    full_text_to_speak = ""
-    
-    for section, content in st.session_state.script_data.items():
-        timestamp = content.get('timestamp', '00:00')
-        text = content.get('text', '')
-        
-        # Voeg de tekst toe aan de volledige string (met een spatie ertussen)
-        full_text_to_speak += text + " "
-        
-        formatted_title = section.replace("_", " ").upper()
-        st.markdown(f"**<span style='color:#FF4B4B'>{formatted_title} ({timestamp})</span>:**", unsafe_allow_html=True)
-        st.write(text)
+    # Weergave als er een script is
+    if st.session_state.script_data:
         st.divider()
-    
-    with st.expander("Bekijk ruwe JSON data (voor debugging)"):
-        st.json(st.session_state.script_data)
+        st.subheader("Jouw Script")
+        for section, content in st.session_state.script_data.items():
+            timestamp = content.get('timestamp', '00:00')
+            text = content.get('text', '')
+            formatted_title = section.replace("_", " ").upper()
+            
+            st.markdown(f"**<span style='color:#FF4B4B'>{formatted_title} ({timestamp})</span>:**", unsafe_allow_html=True)
+            st.write(text)
 
-    st.markdown("### 🔊 Audio Genereren")
+# --- SCHERM 2: SCRIPT TO VOICE OVER ---
+elif menu_keuze == "🎙️ Script to Voice Over":
+    st.header("🎙️ Script to Voice Over")
+    st.markdown("Genereer de audio in rapid-fire tempo (zonder stiltes).")
     
-    if elevenlabs_api_key and voice_id:
-        if st.button("🎙️ Maak Voice-over & Verwijder Stiltes", type="primary", use_container_width=True):
+    # We geven de gebruiker een tekstvak waar de gegenereerde tekst in staat. 
+    # Zo kunnen ze eventueel nog handmatig iets aanpassen voor het inspreken!
+    te_spreken_tekst = st.text_area(
+        "Tekst voor ElevenLabs (pas aan indien nodig):", 
+        value=st.session_state.full_text_to_speak.strip(), 
+        height=200
+    )
+    
+    if st.button("🎙️ Maak Voice-over & Verwijder Stiltes", type="primary", use_container_width=True):
+        if not te_spreken_tekst:
+            st.warning("⚠️ Er is geen tekst om in te spreken. Genereer eerst een script of typ hierboven tekst.")
+        else:
             with st.spinner("ElevenLabs is aan het inspreken en de AI knipt de stiltes weg..."):
                 url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
                 
@@ -111,7 +134,7 @@ if st.session_state.script_data:
                 }
                 
                 data = {
-                    "text": full_text_to_speak.strip(),
+                    "text": te_spreken_tekst,
                     "model_id": "eleven_multilingual_v2",
                     "voice_settings": {
                         "stability": 0.5,
@@ -125,39 +148,26 @@ if st.session_state.script_data:
                     if el_response.status_code == 200:
                         ruwe_audio_bytes = el_response.content
                         
-                        # --- START AUDIO BEWERKING ---
-                        from pydub import AudioSegment
-                        from pydub.silence import split_on_silence
-                        import io
-                        
-                        # Laad de audio in Pydub
+                        # Audio bewerking met Pydub
                         audio_segment = AudioSegment.from_file(io.BytesIO(ruwe_audio_bytes), format="mp3")
-                        
-                        # Detecteer stiltes en knip de audio op
                         chunks = split_on_silence(
                             audio_segment,
-                            min_silence_len=150,     # Knip stiltes langer dan 150ms eruit
-                            silence_thresh=-40,      # Het volume (in dB) dat we als 'stilte' beschouwen
-                            keep_silence=20          # Laat 20ms over voor een heeeel klein beetje overgang
+                            min_silence_len=150,     
+                            silence_thresh=-40,      
+                            keep_silence=20          
                         )
                         
-                        # Plak alles strak aan elkaar vast
                         bewerkte_audio = AudioSegment.empty()
                         for chunk in chunks:
                             bewerkte_audio += chunk
                             
-                        # Zet terug naar MP3 bytes voor de download
                         buffer = io.BytesIO()
                         bewerkte_audio.export(buffer, format="mp3")
                         finale_audio_bytes = buffer.getvalue()
-                        # --- EINDE AUDIO BEWERKING ---
 
-                        st.success("Audio succesvol gegenereerd én supersnel achter elkaar gezet!")
-                        
-                        # Speel de bewerkte audio af in de app
+                        st.success("✅ Audio succesvol gegenereerd en stiltes verwijderd!")
                         st.audio(finale_audio_bytes, format='audio/mp3')
                         
-                        # Downloadknop voor de supersnelle MP3
                         st.download_button(
                             label="⬇️ Download Rapid-Fire .mp3",
                             data=finale_audio_bytes,
@@ -169,5 +179,3 @@ if st.session_state.script_data:
                         st.error(f"ElevenLabs Error: {el_response.text}")
                 except Exception as e:
                     st.error(f"Fout bij het verwerken van de audio: {e}")
-    else:
-        st.info("Vul je ElevenLabs API key en Voice ID in (in de linkerbalk) om de audio-knop te ontgrendelen.")
