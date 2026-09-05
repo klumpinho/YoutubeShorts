@@ -37,28 +37,29 @@ with st.sidebar:
     st.divider()
     st.caption("✅ API Keys Actief")
 
-# De System Prompt (Aangepast voor MAXIMALE KWALITEIT & STORYTELLING)
+# De System Prompt (Strak, feitelijk en direct - geen overdreven drama)
 system_prompt = """
-You are a highly-paid, master YouTube Shorts copywriter. Your goal is to review a long-form video transcript and extract ONLY the top 2 or 3 absolute best, most dramatic, and visually interesting experiments/stories. IGNORE boring, short, or mundane segments.
+You are a master YouTube Shorts copywriter. Your goal is to review a long-form video transcript and extract the top 2 or 3 best, most interesting experiments. 
 
-You are a STORYTELLER, not a summarizer. You must dramatize the events, use highly descriptive language, and build intense tension. Do not just write instructions; write a gripping narrative.
+CRITICAL RULE: Write in a clean, direct, and factual style. Stick closely to what actually happens in the video. Do NOT use overly dramatic, poetic, or fake Hollywood fluff (no "ticking time bombs", "daring dances", or "chemical storms"). Just state the facts clearly and engagingly.
 You MUST output the scripts in ENGLISH.
 
-Structure for EACH of your chosen top-tier scripts:
-- HOOK: One powerful, extreme sentence as a question. Create a massive 'curiosity gap'.
-- RISING_ACTION_1: 3 to 5 highly descriptive sentences. Dramatize the setup. Explain the impossible goal and the massive scale. Build up the stakes.
-- CONFLICT: 2 to 3 sentences. The devastating plot twist. What went horribly wrong? Make the viewer feel like the experiment is ruined.
-- COMEBACK: 1 to 2 sentences. The genius pivot. How does the creator desperately try to save it?
-- RISING_ACTION_2: 1 to 2 sentences. The intense build-up to the final moment.
-- PAYOFF: 1 to 2 sentences. The highly satisfying, mind-blowing result, preferably with a punchline.
+Structure for EACH script:
+- HOOK: One punchy, direct sentence as a question to create a curiosity gap.
+- RISING_ACTION_1: 3 to 5 sentences. Clearly explain what ingredients or items are used and what the goal is.
+- CONFLICT: 2 to 3 sentences. Explain what unexpectedly goes wrong or what the obstacle is.
+- COMEBACK: 1 to 2 sentences. Explain how the creator solves it or what action they take next.
+- RISING_ACTION_2: 1 to 2 sentences. The build-up to the final moment.
+- PAYOFF: 1 to 2 sentences. The actual, factual result of the experiment.
 
 Output STRICTLY as a JSON object containing a SINGLE key called "scripts". The value of "scripts" MUST be an array of objects.
 Each object must have:
-- "title": A catchy, viral title for this specific script.
+- "title": A clear, catchy title for this specific script.
 - "hook", "rising_action_1", "conflict", "comeback", "rising_action_2", "payoff".
 
 Each of the 6 story keys MUST contain a nested object with exactly two strings: "timestamp" (e.g. "01:30") and "text" (the actual script line).
 """
+
 # --- SCHERM 1: TRANSCRIPT TO SCRIPT ---
 if menu_keuze == "📝 Transcript to Scripts":
     st.header("📝 Transcript to Scripts")
