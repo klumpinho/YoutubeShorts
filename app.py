@@ -9,17 +9,19 @@ st.set_page_config(page_title="JackCraig Script Builder", layout="wide")
 st.title("🎬 JackCraig Script Builder")
 st.markdown("Zet long-form transcripts om in strakke, virale Shorts scripts inclusief ElevenLabs voice-overs.")
 
-# Sidebar voor API keys
+# Haal de API keys onzichtbaar op uit Streamlit Secrets
+try:
+    openai_api_key = st.secrets["OPENAI_API_KEY"]
+    elevenlabs_api_key = st.secrets["ELEVENLABS_API_KEY"]
+    voice_id = st.secrets.get("VOICE_ID", "pNInz6obpgDQGcFmaJgB") # Standaard Adam
+except KeyError:
+    st.error("⚠️ De API keys ontbreken in de Streamlit Secrets! Voeg ze toe in je dashboard.")
+    st.stop()
+
+# We houden de sidebar alleen nog voor een beetje info
 with st.sidebar:
-    st.header("⚙️ Instellingen")
-    openai_api_key = st.text_input("OpenAI API Key", type="password")
-    
-    st.divider()
-    st.subheader("🎙️ ElevenLabs Settings")
-    elevenlabs_api_key = st.text_input("ElevenLabs API Key", type="password")
-    # Standaard Voice ID (Adam), pas dit aan naar je favoriete stem
-    voice_id = st.text_input("Voice ID", value="pNInz6obpgDQGcFmaJgB") 
-    st.markdown("*Tip: Je vindt de Voice ID in je ElevenLabs dashboard onder 'Voices'. Klik op het ID-icoontje naast je stem om deze te kopiëren.*")
+    st.success("✅ API Keys succesvol en veilig geladen!")
+    st.markdown("Je bent direct klaar om scripts en audio te genereren.")
 
 # Initializeer session state zodat het script niet verdwijnt bij een nieuwe klik
 if "script_data" not in st.session_state:
